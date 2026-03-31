@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0c">
+<title>Loom Cipher - 暗号織機</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+:root{
+  --bg:#0a0a0c;--bg2:#131317;--bg3:#1c1c22;
+  --fg:#e8e6e0;--fg2:#8a8880;--fg3:#3e3d39;
+  --accent:#c8a44e;--accent2:#9a7a30;--accentBg:rgba(200,164,78,.1);
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Noto Sans JP','JetBrains Mono',sans-serif;
+}
+html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--mono)}
+
+/* ====== START SCREEN ====== */
+#start{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px}
+#start.gone{display:none}
+.sLogo{font-size:10px;letter-spacing:6px;text-transform:uppercase;color:var(--fg3);font-weight:500}
+.sTitle{font-size:26px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase}
+.sSub{font-size:12px;color:var(--fg2);text-align:center;line-height:1.9;max-width:300px;font-family:var(--sans)}
+.sBtns{display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px}
+.sBtn{padding:15px 20px;border:1px solid var(--fg3);border-radius:12px;background:var(--bg2);color:var(--fg);font-family:var(--mono);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s}
+.sBtn:active{transform:scale(.97);background:var(--bg3)}
+.sBtn.hi{border-color:var(--accent2);color:var(--accent)}
+.sDesc{font-size:11px;color:var(--fg2);font-weight:400;margin-top:4px;font-family:var(--sans)}
+.aiBox{display:none;flex-direction:column;align-items:center;gap:10px}
+.aiBox.show{display:flex}
+.wordRow{display:flex;gap:8px;align-items:center}
+.wordRow input{background:var(--bg3);border:1px solid var(--fg3);color:var(--accent);font-family:var(--mono);font-size:20px;font-weight:700;letter-spacing:8px;text-transform:uppercase;width:120px;padding:8px 12px;border-radius:8px;text-align:center}
+.wordRow input:focus{outline:none;border-color:var(--accent2)}
+.wordRow span{font-size:11px;color:var(--fg2);font-family:var(--sans);line-height:1.4}
+
+/* ====== MAIN APP ====== */
+#app{display:none;flex-direction:column;height:100%}
+#app.on{display:flex}
+
+/* -- Top: Result -- */
+.top{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;position:relative;min-height:0;overflow:hidden}
+.topBar{position:absolute;top:max(12px,env(safe-area-inset-top,12px));left:16px;right:16px;display:flex;justify-content:space-between;align-items:center}
+.topLabel{font-size:9px;letter-spacing:4px;color:var(--fg3);text-transform:uppercase}
+.rstBtn{font-size:9px;letter-spacing:2px;color:var(--fg3);text-transform:uppercase;background:none;border:1px solid var(--fg3);padding:4px 10px;border-radius:6px;cursor:pointer;font-family:var(--mono)}
+.rstBtn:active{background:var(--bg3)}
+
+.fabric{display:flex;flex-direction:column;border:1px solid var(--fg3);border-radius:3px;overflow:hidden}
+.fRow{display:flex}
+.fC{transition:background .3s ease}
+.fC.bk{background:#141414}
+.fC.wh{background:#d4d0c8}
+
+.hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:10px;color:var(--fg3);font-family:var(--sans);letter-spacing:.5px;transition:color .3s}
+
+/* -- Bottom: Controls -- */
+.bot{background:var(--bg2);border-top:1px solid var(--fg3);display:flex;flex-direction:column;flex-shrink:0}
+
+/* Row tabs */
+.tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.05);padding:0 2px}
+.tab{flex:1;padding:10px 0 7px;text-align:center;font-size:12px;font-weight:500;color:var(--fg3);cursor:pointer;position:relative;border:none;background:none;font-family:var(--mono);transition:color .15s}
+.tab.on{color:var(--accent)}
+.tab.on::after{content:'';position:absolute;bottom:-1px;left:18%;right:18%;height:2px;background:var(--accent);border-radius:1px}
+.dots{display:flex;gap:2px;justify-content:center;margin-top:4px}
+.dt{width:4px;height:4px;border-radius:50%;background:var(--fg3);transition:background .15s}
+.dt.on{background:var(--accent)}
+
+/* Shaft 3x3 grid */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px}
+.shBtn{
+  aspect-ratio:1;border-radius:14px;
+  border:2px solid var(--fg3);background:var(--bg3);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  cursor:pointer;transition:all .12s;
+}
+.shBtn:active{transform:scale(.92)}
+.shBtn.up{border-color:var(--accent);background:var(--accentBg)}
+.shN{font-size:22px;font-weight:700;color:var(--fg3);transition:color .12s}
+.shBtn.up .shN{color:var(--accent)}
+.shS{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--fg3);font-weight:600;transition:color .12s}
+.shBtn.up .shS{color:var(--accent2)}
+
+/* Status */
+.statBar{display:flex;justify-content:center;align-items:center;padding:6px 16px;gap:5px;border-top:1px solid rgba(255,255,255,.03);background:var(--bg)}
+.sd{width:6px;height:6px;border-radius:50%;transition:background .15s}
+.sd.on{background:var(--accent)}
+.sd.off{background:var(--fg3)}
+@supports(padding-bottom:env(safe-area-inset-bottom)){.statBar{padding-bottom:calc(6px + env(safe-area-inset-bottom))}}
+</style>
+</head>
+<body>
+
+<!-- START -->
+<div id="start">
+  <div class="sLogo">Floor Loom</div>
+  <div class="sTitle">暗号織機</div>
+  <div class="sSub">9本のシャフトを操作して<br>織物に隠されたメッセージを解読せよ</div>
+  <div class="sBtns">
+    <button class="sBtn hi" onclick="showAI()">暗号を仕込む（AIモード）<div class="sDesc">AIが3文字の暗号を織りに隠します</div></button>
+    <div class="aiBox" id="aiBox">
+      <div class="wordRow">
+        <input type="text" id="aiW" maxlength="3" value="SPY" placeholder="ABC" autocomplete="off" autocapitalize="characters">
+        <span>3文字<br>入力</span>
+      </div>
+      <button class="sBtn hi" onclick="goAI()">この文字を隠してスタート</button>
+    </div>
+    <button class="sBtn" onclick="goManual()">手動モード<div class="sDesc">真っ暗な状態から自力で文字を探す</div></button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="top">
+    <div class="topBar">
+      <span class="topLabel">Fabric output</span>
+      <button class="rstBtn" onclick="doReset()">Reset</button>
+    </div>
+    <div class="fabric" id="fab"></div>
+    <div class="hint" id="hint"></div>
+  </div>
+  <div class="bot">
+    <div class="tabs" id="tabs"></div>
+    <div class="grid" id="grid"></div>
+    <div class="statBar" id="sbar"></div>
+  </div>
+</div>
+
+<script>
+const F={A:[[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],B:[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,1,0]],C:[[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],D:[[1,1,0],[1,0,1],[1,0,1],[1,0,1],[1,1,0]],E:[[1,1,1],[1,0,0],[1,1,1],[1,0,0],[1,1,1]],F_:[[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,0,0]],G:[[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],H:[[1,0,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],I:[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],J:[[0,1,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],K:[[1,0,1],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],L:[[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],O:[[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],P:[[1,1,0],[1,0,1],[1,1,0],[1,0,0],[1,0,0]],Q:[[0,1,0],[1,0,1],[1,0,1],[0,1,0],[0,0,1]],R:[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],S:[[0,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]],T:[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],U:[[1,0,1],[1,0,1],[1,0,1],[1,0,1],[1,1,1]],V:[[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],X:[[1,0,1],[1,0,1],[0,1,0],[1,0,1],[1,0,1]],Y:[[1,0,1],[1,0,1],[0,1,0],[0,1,0],[0,1,0]],Z:[[1,1,1],[0,0,1],[0,1,0],[1,0,0],[1,1,1]]};
+F['F']=F.F_;delete F.F_;
+
+// Scramble: column index (0-8) → shaft button index (0-8)
+const SC=[4,8,2,6,1,7,3,5,0];
+
+let st=[],ar=0,sec=null;
+
+function showAI(){document.getElementById('aiBox').classList.add('show')}
+
+function goAI(){
+  let w=document.getElementById('aiW').value.toUpperCase().replace(/[^A-Z]/g,'');
+  w=w.split('').filter(c=>F[c]).join('').slice(0,3);
+  if(!w)w='SPY';while(w.length<3)w+='A';
+  sec=w;
+  st=[];for(let r=0;r<5;r++)st.push(new Array(9).fill(false));
+  const ch=w.split('');
+  for(let r=0;r<5;r++)for(let ci=0;ci<3;ci++)for(let col=0;col<3;col++){
+    const s=SC[ci*3+col];
+    st[r][s]=(F[ch[ci]][r][col]===0);
+  }
+  launch();
+}
+
+function goManual(){
+  sec=null;
+  st=[];for(let r=0;r<5;r++)st.push(new Array(9).fill(true));
+  launch();
+}
+
+function launch(){
+  ar=0;
+  document.getElementById('start').classList.add('gone');
+  document.getElementById('app').classList.add('on');
+  buildAll();render();
+}
+
+function doReset(){
+  document.getElementById('start').classList.remove('gone');
+  document.getElementById('app').classList.remove('on');
+  document.getElementById('aiBox').classList.remove('show');
+  ar=0;sec=null;
+}
+
+function buildAll(){buildTabs();buildGrid();buildSbar();buildFab()}
+
+function buildTabs(){
+  let h='';
+  for(let r=0;r<5;r++){
+    h+=`<button class="tab${r===ar?' on':''}" onclick="sw(${r})"><span>段${r+1}</span><div class="dots">`;
+    for(let s=0;s<9;s++)h+=`<div class="dt${st[r][s]?' on':''}" id="d${r}${s}"></div>`;
+    h+='</div></button>';
+  }
+  document.getElementById('tabs').innerHTML=h;
+}
+
+function buildGrid(){
+  let h='';
+  for(let s=0;s<9;s++){
+    const u=st[ar][s];
+    h+=`<button class="shBtn${u?' up':''}" id="b${s}" onclick="tg(${s})"><div class="shN">${s+1}</div><div class="shS">${u?'上げ':'下げ'}</div></button>`;
+  }
+  document.getElementById('grid').innerHTML=h;
+}
+
+function buildSbar(){
+  let h='';for(let s=0;s<9;s++)h+=`<div class="sd${st[ar][s]?' on':' off'}" id="z${s}"></div>`;
+  document.getElementById('sbar').innerHTML=h;
+}
+
+function buildFab(){
+  const pad=4,tot=pad+11+pad;
+  const mw=Math.min(window.innerWidth-40,380);
+  const cs=Math.floor(mw/tot);
+  let h='';
+  for(let r=0;r<5;r++){
+    h+='<div class="fRow">';
+    for(let c=0;c<tot;c++)h+=`<div class="fC" id="f${r}_${c}" style="width:${cs}px;height:${cs}px"></div>`;
+    h+='</div>';
+  }
+  document.getElementById('fab').innerHTML=h;
+}
+
+function sw(r){
+  ar=r;
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',i===r));
+  buildGrid();buildSbar();
+}
+
+function tg(s){
+  st[ar][s]=!st[ar][s];
+  const u=st[ar][s];
+  const b=document.getElementById('b'+s);
+  b.classList.toggle('up',u);
+  b.querySelector('.shS').textContent=u?'上げ':'下げ';
+  const d=document.getElementById('d'+ar+s);
+  if(d)d.classList.toggle('on',u);
+  const z=document.getElementById('z'+s);
+  if(z){z.classList.toggle('on',u);z.classList.toggle('off',!u)}
+  if(navigator.vibrate)navigator.vibrate(u?[10]:[5]);
+  render();
+}
+
+function render(){
+  const pad=4,tot=pad+11+pad;
+  for(let r=0;r<5;r++)for(let c=0;c<tot;c++){
+    const el=document.getElementById('f'+r+'_'+c);
+    if(!el)continue;
+    let sb=-1;
+    const tc=c-pad;
+    if(tc>=0&&tc<11){
+      if(tc!==3&&tc!==7){
+        let ci;if(tc<3)ci=tc;else if(tc<7)ci=tc-1;else ci=tc-2;
+        if(ci>=0&&ci<9)sb=SC[ci];
+      }
+    }
+    const raised=sb===-1?true:st[r][sb];
+    el.classList.toggle('bk',raised);
+    el.classList.toggle('wh',!raised);
+  }
+  const h=document.getElementById('hint');
+  if(sec){
+    const ok=chk();
+    h.textContent=ok?'正解！「'+sec+'」を発見':'シャフトの組み合わせを変えて文字を探せ';
+    h.style.color=ok?'var(--accent)':'var(--fg3)';
+  }else{
+    h.textContent='各段のシャフトを操作して文字を探せ';
+  }
+}
+
+function chk(){
+  if(!sec)return false;
+  const ch=sec.split('');
+  for(let r=0;r<5;r++)for(let ci=0;ci<3;ci++){
+    if(!F[ch[ci]])return false;
+    for(let col=0;col<3;col++){
+      const sb=SC[ci*3+col];
+      if(st[r][sb]!==(F[ch[ci]][r][col]===0))return false;
+    }
+  }
+  return true;
+}
+
+window.addEventListener('resize',()=>{if(document.getElementById('app').classList.contains('on')){buildFab();render()}});
+</script>
+</body>
+</html>
