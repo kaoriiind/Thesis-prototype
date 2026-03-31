@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a0c">
+<title>Loom Cipher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0a0c;--bg2:#131317;--bg3:#1c1c22;
+  --fg:#e8e6e0;--fg2:#8a8880;--fg3:#3e3d39;
+  --accent:#c8a44e;--accent2:#9a7a30;--accentBg:rgba(200,164,78,.12);
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Noto Sans','JetBrains Mono',system-ui,-apple-system,sans-serif;
+}
+
+html,body{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--mono)}
+button,input{font-family:inherit}
+button{cursor:pointer}
+
+/* ====== START SCREEN ====== */
+#start{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px}
+#start.gone{display:none}
+.sLogo{font-size:10px;letter-spacing:6px;text-transform:uppercase;color:var(--fg3);font-weight:500}
+.sTitle{font-size:26px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase;text-align:center}
+.sSub{font-size:12px;color:var(--fg2);text-align:center;line-height:1.85;max-width:340px;font-family:var(--sans)}
+.sBtns{display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px}
+.sBtn{padding:15px 18px;border:1px solid var(--fg3);border-radius:12px;background:var(--bg2);color:var(--fg);font-size:13px;font-weight:600;text-align:left;transition:all .15s}
+.sBtn:active{transform:scale(.97);background:var(--bg3)}
+.sBtn.hi{border-color:var(--accent2);color:var(--accent)}
+.sDesc{font-size:11px;color:var(--fg2);font-weight:400;margin-top:4px;font-family:var(--sans);line-height:1.5}
+.aiBox{display:none;flex-direction:column;align-items:center;gap:10px;padding-top:4px}
+.aiBox.show{display:flex}
+.wordRow{display:flex;gap:10px;align-items:center}
+.wordRow input{
+  background:var(--bg3);border:1px solid var(--fg3);color:var(--accent);
+  font-size:20px;font-weight:700;letter-spacing:8px;text-transform:uppercase;width:140px;
+  padding:10px 12px;border-radius:10px;text-align:center;
+}
+.wordRow input:focus{outline:none;border-color:var(--accent2)}
+.wordRow span{font-size:11px;color:var(--fg2);font-family:var(--sans);line-height:1.4}
+
+/* ====== APP LAYOUT ====== */
+#app{display:none;height:100%}
+#app.on{display:block}
+
+/* Portrait: output on top (≈40%), controls below */
+.appWrap{
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+.outPane{
+  position:relative;
+  flex:0 0 40%;
+  min-height:180px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  overflow:hidden;
+}
+.ctrlPane{
+  flex:1;
+  min-height:0;
+  background:var(--bg2);
+  border-top:1px solid var(--fg3);
+  display:flex;
+  flex-direction:column;
+}
+
+/* Top bar on output */
+.topBar{
+  position:absolute;
+  top:max(12px,env(safe-area-inset-top,12px));
+  left:16px;right:16px;
+  display:flex;justify-content:space-between;align-items:center;
+  pointer-events:auto;
+}
+.topLabel{font-size:9px;letter-spacing:4px;color:var(--fg3);text-transform:uppercase}
+.rstBtn{
+  font-size:9px;letter-spacing:2px;color:var(--fg3);text-transform:uppercase;
+  background:none;border:1px solid var(--fg3);padding:5px 10px;border-radius:7px;
+}
+.rstBtn:active{background:var(--bg3)}
+
+/* Fabric */
+.fabricWrap{display:flex;align-items:center;justify-content:center;max-width:100%;max-height:100%}
+.fabric{display:flex;flex-direction:column;border:1px solid var(--fg3);border-radius:3px;overflow:hidden}
+.fRow{display:flex}
+.fC{transition:background .25s ease}
+.fC.bk{background:#141414}
+.fC.wh{background:#d4d0c8}
+
+.hint{
+  position:absolute;bottom:10px;left:0;right:0;
+  text-align:center;font-size:10px;color:var(--fg3);
+  font-family:var(--sans);letter-spacing:.5px;
+  transition:color .25s;
+}
+
+/* ====== PORTRAIT CONTROLS (tabs left + 3x3) ====== */
+.portraitControls{
+  flex:1;
+  min-height:0;
+  display:flex;
+}
+.tabsCol{
+  width:92px;
+  border-right:1px solid rgba(255,255,255,.06);
+  background:rgba(0,0,0,.08);
+  padding:8px 6px;
+  overflow:auto;
+}
+.tab{
+  width:100%;
+  border:none;
+  background:none;
+  color:var(--fg3);
+  padding:10px 6px;
+  border-radius:10px;
+  text-align:left;
+  transition:color .15s, background .15s;
+}
+.tab.on{color:var(--accent);background:rgba(200,164,78,.08)}
+.tabTitle{font-size:11px;font-weight:600;letter-spacing:.2px}
+.dots{display:flex;gap:2px;margin-top:6px}
+.dt{width:4px;height:4px;border-radius:50%;background:var(--fg3);transition:background .15s}
+.dt.on{background:var(--accent)}
+
+.gridWrap{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  padding:12px 14px 10px;
+  flex:1;
+  min-height:0;
+  align-content:center;
+}
+.statBar{
+  display:flex;justify-content:center;align-items:center;
+  padding:8px 16px;gap:6px;
+  border-top:1px solid rgba(255,255,255,.05);
+  background:var(--bg);
+}
+.sd{width:6px;height:6px;border-radius:50%;transition:background .15s}
+.sd.on{background:var(--accent)}
+.sd.off{background:var(--fg3)}
+@supports(padding-bottom:env(safe-area-inset-bottom)){
+  .statBar{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+}
+
+/* ====== BUTTON (weight-like interaction) ====== */
+.shBtn{
+  position:relative;
+  border-radius:14px;
+  border:2px solid var(--fg3);
+  background:var(--bg3);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  padding:10px 6px;
+  user-select:none;
+  transition:transform .16s ease, border-color .16s ease, background .16s ease;
+  overflow:hidden;
+  box-shadow:0 10px 18px rgba(0,0,0,.28);
+}
+.shBtn:active{transform:translateY(1px) scale(.98)}
+.shBtn .shN{font-size:22px;font-weight:700;color:var(--fg3);transition:color .16s ease, transform .16s ease}
+.shBtn .shS{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--fg3);font-weight:700;transition:color .16s ease}
+
+/* "Weight" indicator */
+.shBtn .wt{
+  position:absolute;
+  left:50%;
+  top:8px;
+  width:28px;
+  height:28px;
+  transform:translateX(-50%) translateY(-26px);
+  border-radius:12px;
+  background:rgba(232,230,224,.06);
+  border:1px solid rgba(232,230,224,.14);
+  box-shadow:0 8px 14px rgba(0,0,0,.35);
+  transition:transform .22s cubic-bezier(.2,.9,.2,1), opacity .22s ease;
+  opacity:0;
+}
+.shBtn.up{border-color:var(--accent);background:var(--accentBg)}
+.shBtn.up .shN{color:var(--accent)}
+.shBtn.up .shS{color:var(--accent2)}
+/* When "up" (raised), we show a weight pushed inward (down/back) */
+.shBtn.up .wt{
+  opacity:1;
+  transform:translateX(-50%) translateY(0px) scale(.98);
+}
+
+/* Add subtle "plate goes down" effect */
+.shBtn.up{transform:translateY(2px)}
+/* But keep tap feedback */
+.shBtn.up:active{transform:translateY(3px) scale(.98)}
+
+/* ====== LANDSCAPE / LARGE: split 50/50 and show full 9x5 ====== */
+.matrixControls{display:none;flex:1;min-height:0;overflow:auto;padding:10px 12px}
+.matrixRow{
+  display:grid;
+  grid-template-columns:52px repeat(9,1fr);
+  gap:8px;
+  padding:10px 0;
+  align-items:center;
+}
+.matrixRow + .matrixRow{border-top:1px solid rgba(255,255,255,.06)}
+.rowLbl{
+  font-size:10px;
+  color:var(--fg2);
+  font-family:var(--sans);
+  letter-spacing:.6px;
+  text-transform:uppercase;
+  text-align:right;
+  padding-right:4px;
+}
+
+/* In matrix, buttons should fit and still feel like "plates" */
+.matrixControls .shBtn{
+  border-radius:12px;
+  padding:8px 4px;
+  box-shadow:0 8px 14px rgba(0,0,0,.25);
+}
+.matrixControls .shBtn .shN{font-size:16px}
+.matrixControls .shBtn .shS{display:none} /* label via row separation; keep clean */
+.matrixControls .shBtn .wt{width:22px;height:22px;border-radius:10px}
+
+/* Switch rules */
+@media (orientation: landscape){
+  .appWrap{flex-direction:row}
+  .outPane{
+    flex:0 0 50%;
+    height:100%;
+    min-height:0;
+    border-left:1px solid rgba(255,255,255,.06);
+  }
+  .ctrlPane{
+    flex:0 0 50%;
+    height:100%;
+    border-top:none;
+  }
+  .portraitControls{display:none}
+  .matrixControls{display:block}
+}
+@media (min-width: 900px){
+  /* Desktop/tablet wide: keep split and matrix */
+  .appWrap{flex-direction:row}
+  .outPane{flex:0 0 50%;height:100%}
+  .ctrlPane{flex:0 0 50%;height:100%;border-top:none}
+  .portraitControls{display:none}
+  .matrixControls{display:block}
+}
+
+/* Keep things selectable for input only */
+input{-webkit-user-select:text;user-select:text}
+</style>
+</head>
+<body>
+
+<!-- START -->
+<div id="start">
+  <div class="sLogo">Floor Loom</div>
+  <div class="sTitle">Loom Cipher</div>
+  <div class="sSub">Use nine shafts to reveal the hidden message woven into the fabric.</div>
+
+  <div class="sBtns">
+    <button class="sBtn hi" onclick="showAI()">
+      Hide a code (AI mode)
+      <div class="sDesc">The system weaves a 3-letter code into the fabric.</div>
+    </button>
+
+    <div class="aiBox" id="aiBox">
+      <div class="wordRow">
+        <input type="text" id="aiW" maxlength="3" value="SPY" placeholder="ABC" autocomplete="off" autocapitalize="characters">
+        <span>Enter<br>3 letters</span>
+      </div>
+      <button class="sBtn hi" onclick="goAI()">Hide this code and start</button>
+    </div>
+
+    <button class="sBtn" onclick="goManual()">
+      Manual mode
+      <div class="sDesc">Start from a fully dark fabric and find the letters yourself.</div>
+    </button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="appWrap">
+    <!-- LEFT / TOP: CONTROLS -->
+    <div class="ctrlPane">
+      <!-- Portrait controls -->
+      <div class="portraitControls" id="portraitControls">
+        <div class="tabsCol" id="tabs"></div>
+        <div class="gridWrap">
+          <div class="grid" id="grid"></div>
+          <div class="statBar" id="sbar"></div>
+        </div>
+      </div>
+
+      <!-- Landscape / desktop controls (9x5) -->
+      <div class="matrixControls" id="matrix"></div>
+    </div>
+
+    <!-- RIGHT / TOP: OUTPUT -->
+    <div class="outPane">
+      <div class="topBar">
+        <span class="topLabel">Fabric output</span>
+        <button class="rstBtn" onclick="doReset()">Reset</button>
+      </div>
+      <div class="fabricWrap">
+        <div class="fabric" id="fab"></div>
+      </div>
+      <div class="hint" id="hint"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ====== Fonts (3x3) ====== */
+const F={
+  A:[[0,1,0],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+  B:[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,1,0]],
+  C:[[0,1,1],[1,0,0],[1,0,0],[1,0,0],[0,1,1]],
+  D:[[1,1,0],[1,0,1],[1,0,1],[1,0,1],[1,1,0]],
+  E:[[1,1,1],[1,0,0],[1,1,1],[1,0,0],[1,1,1]],
+  F_:[[1,1,1],[1,0,0],[1,1,0],[1,0,0],[1,0,0]],
+  G:[[0,1,1],[1,0,0],[1,0,1],[1,0,1],[0,1,1]],
+  H:[[1,0,1],[1,0,1],[1,1,1],[1,0,1],[1,0,1]],
+  I:[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[1,1,1]],
+  J:[[0,1,1],[0,0,1],[0,0,1],[1,0,1],[0,1,0]],
+  K:[[1,0,1],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+  L:[[1,0,0],[1,0,0],[1,0,0],[1,0,0],[1,1,1]],
+  O:[[0,1,0],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+  P:[[1,1,0],[1,0,1],[1,1,0],[1,0,0],[1,0,0]],
+  Q:[[0,1,0],[1,0,1],[1,0,1],[0,1,0],[0,0,1]],
+  R:[[1,1,0],[1,0,1],[1,1,0],[1,0,1],[1,0,1]],
+  S:[[0,1,1],[1,0,0],[0,1,0],[0,0,1],[1,1,0]],
+  T:[[1,1,1],[0,1,0],[0,1,0],[0,1,0],[0,1,0]],
+  U:[[1,0,1],[1,0,1],[1,0,1],[1,0,1],[1,1,1]],
+  V:[[1,0,1],[1,0,1],[1,0,1],[1,0,1],[0,1,0]],
+  X:[[1,0,1],[1,0,1],[0,1,0],[1,0,1],[1,0,1]],
+  Y:[[1,0,1],[1,0,1],[0,1,0],[0,1,0],[0,1,0]],
+  Z:[[1,1,1],[0,0,1],[0,1,0],[1,0,0],[1,1,1]]
+};
+F['F']=F.F_; delete F.F_;
+
+/* Scramble: column index (0-8) -> shaft button index (0-8) */
+const SC=[4,8,2,6,1,7,3,5,0];
+
+let st=[], ar=0, sec=null;
+
+function showAI(){ document.getElementById('aiBox').classList.add('show'); }
+
+function goAI(){
+  let w=document.getElementById('aiW').value.toUpperCase().replace(/[^A-Z]/g,'');
+  w=w.split('').filter(c=>F[c]).join('').slice(0,3);
+  if(!w) w='SPY';
+  while(w.length<3) w+='A';
+
+  sec=w;
+  st=[]; for(let r=0;r<5;r++) st.push(new Array(9).fill(false));
+  const ch=w.split('');
+
+  for(let r=0;r<5;r++) for(let ci=0;ci<3;ci++) for(let col=0;col<3;col++){
+    const s=SC[ci*3+col];
+    st[r][s]=(F[ch[ci]][r][col]===0);
+  }
+  launch();
+}
+
+function goManual(){
+  sec=null;
+  st=[]; for(let r=0;r<5;r++) st.push(new Array(9).fill(true));
+  launch();
+}
+
+function launch(){
+  ar=0;
+  document.getElementById('start').classList.add('gone');
+  document.getElementById('app').classList.add('on');
+  buildAll();
+  render();
+}
+
+function doReset(){
+  document.getElementById('start').classList.remove('gone');
+  document.getElementById('app').classList.remove('on');
+  document.getElementById('aiBox').classList.remove('show');
+  ar=0; sec=null;
+}
+
+/* ====== UI BUILD ====== */
+function buildAll(){
+  buildTabs();
+  buildGrid();
+  buildSbar();
+  buildMatrix();
+  buildFab();
+}
+
+/* Portrait tabs (vertical, Row 1 at top -> Row 5 bottom) */
+function buildTabs(){
+  let h='';
+  for(let r=0;r<5;r++){
+    h+=`<button class="tab${r===ar?' on':''}" onclick="sw(${r})">
+          <div class="tabTitle">Row ${r+1}</div>
+          <div class="dots">` +
+          [...Array(9)].map((_,s)=>`<div class="dt${st[r][s]?' on':''}" id="d${r}${s}"></div>`).join('')
+        + `</div>
+        </button>`;
+  }
+  document.getElementById('tabs').innerHTML=h;
+}
+
+/* Portrait 3x3 controls for current row */
+function buildGrid(){
+  let h='';
+  for(let s=0;s<9;s++){
+    const u=st[ar][s];
+    h+=`<button class="shBtn${u?' up':''}" id="b${s}" onclick="tg(${ar},${s})" aria-label="Shaft ${s+1}">
+          <div class="wt" aria-hidden="true"></div>
+          <div class="shN">${s+1}</div>
+          <div class="shS">${u?'DOWN':'UP'}</div>
+        </button>`;
+  }
+  document.getElementById('grid').innerHTML=h;
+}
+
+/* Portrait status dots for current row */
+function buildSbar(){
+  let h=''; for(let s=0;s<9;s++) h+=`<div class="sd${st[ar][s]?' on':' off'}" id="z${s}"></div>`;
+  document.getElementById('sbar').innerHTML=h;
+}
+
+/* Landscape/desktop matrix: show all 5 rows x 9 shafts, with row labels and separators */
+function buildMatrix(){
+  const host=document.getElementById('matrix');
+  let h='';
+  for(let r=0;r<5;r++){
+    h+=`<div class="matrixRow" id="mr${r}">
+          <div class="rowLbl">Row ${r+1}</div>`;
+    for(let s=0;s<9;s++){
+      const u=st[r][s];
+      h+=`<button class="shBtn${u?' up':''}" id="m${r}_${s}" onclick="tg(${r},${s})" aria-label="Row ${r+1}, Shaft ${s+1}">
+            <div class="wt" aria-hidden="true"></div>
+            <div class="shN">${s+1}</div>
+            <div class="shS">${u?'DOWN':'UP'}</div>
+          </button>`;
+    }
+    h+=`</div>`;
+  }
+  host.innerHTML=h;
+}
+
+/* Fabric: size cells dynamically from the available output pane */
+function buildFab(){
+  const fab=document.getElementById('fab');
+  const wrap=fab.parentElement; // .fabricWrap
+  const pad=4, tot=pad+11+pad;
+
+  // Available size inside output area
+  const out=document.querySelector('.outPane');
+  const ob=out.getBoundingClientRect();
+  // Reserve space for top bar + hint
+  const availW=Math.max(240, ob.width-32);
+  const availH=Math.max(160, ob.height-70);
+
+  // We need 5 rows by tot cols
+  const cs=Math.floor(Math.min(availW/tot, availH/5));
+  let h='';
+  for(let r=0;r<5;r++){
+    h+='<div class="fRow">';
+    for(let c=0;c<tot;c++){
+      h+=`<div class="fC" id="f${r}_${c}" style="width:${cs}px;height:${cs}px"></div>`;
+    }
+    h+='</div>';
+  }
+  fab.innerHTML=h;
+}
+
+/* ====== INTERACTION ====== */
+function sw(r){
+  ar=r;
+  document.querySelectorAll('#tabs .tab').forEach((t,i)=>t.classList.toggle('on',i===r));
+  buildGrid();
+  buildSbar();
+}
+
+/* Toggle a specific row/shaft (works for portrait and matrix) */
+function tg(r,s){
+  st[r][s]=!st[r][s];
+  const u=st[r][s];
+
+  // Update portrait button (only if the toggled row is active)
+  if(r===ar){
+    const b=document.getElementById('b'+s);
+    if(b){
+      b.classList.toggle('up',u);
+      const lab=b.querySelector('.shS');
+      if(lab) lab.textContent=u?'DOWN':'UP';
+    }
+    const z=document.getElementById('z'+s);
+    if(z){ z.classList.toggle('on',u); z.classList.toggle('off',!u); }
+  }
+
+  // Update dot indicators in tabs
+  const d=document.getElementById('d'+r+s);
+  if(d) d.classList.toggle('on',u);
+
+  // Update matrix button
+  const m=document.getElementById(`m${r}_${s}`);
+  if(m){
+    m.classList.toggle('up',u);
+  }
+
+  if(navigator.vibrate) navigator.vibrate(u?[10]:[5]);
+  render();
+}
+
+/* ====== RENDER OUTPUT ====== */
+function render(){
+  const pad=4, tot=pad+11+pad;
+
+  for(let r=0;r<5;r++) for(let c=0;c<tot;c++){
+    const el=document.getElementById('f'+r+'_'+c);
+    if(!el) continue;
+
+    let sb=-1;
+    const tc=c-pad;
+    if(tc>=0 && tc<11){
+      if(tc!==3 && tc!==7){
+        let ci;
+        if(tc<3) ci=tc;
+        else if(tc<7) ci=tc-1;
+        else ci=tc-2;
+        if(ci>=0 && ci<9) sb=SC[ci];
+      }
+    }
+
+    const raised = (sb===-1) ? true : st[r][sb];
+    el.classList.toggle('bk',raised);
+    el.classList.toggle('wh',!raised);
+  }
+
+  const h=document.getElementById('hint');
+  if(sec){
+    const ok=chk();
+    h.textContent = ok ? `Solved! You found “${sec}”.` : 'Try different shaft combinations to reveal the letters.';
+    h.style.color = ok ? 'var(--accent)' : 'var(--fg3)';
+  }else{
+    h.textContent = 'Adjust the shafts in each row to reveal hidden letters.';
+    h.style.color = 'var(--fg3)';
+  }
+}
+
+function chk(){
+  if(!sec) return false;
+  const ch=sec.split('');
+  for(let r=0;r<5;r++) for(let ci=0;ci<3;ci++){
+    if(!F[ch[ci]]) return false;
+    for(let col=0;col<3;col++){
+      const sb=SC[ci*3+col];
+      if(st[r][sb] !== (F[ch[ci]][r][col]===0)) return false;
+    }
+  }
+  return true;
+}
+
+/* Rebuild sizing on resize/orientation change */
+let resizeT=null;
+window.addEventListener('resize',()=>{
+  if(!document.getElementById('app').classList.contains('on')) return;
+  clearTimeout(resizeT);
+  resizeT=setTimeout(()=>{ buildFab(); render(); },120);
+});
+</script>
+</body>
+</html>
